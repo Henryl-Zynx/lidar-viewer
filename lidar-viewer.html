@@ -1,0 +1,1268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LiDAR + Mesh Viewer</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@300;400;500;600&display=swap');
+:root{
+  --bg:#0a0d14;--s1:#10141e;--s2:#161c28;--s3:#1c2333;
+  --bd:rgba(255,255,255,.08);--bd2:rgba(255,255,255,.16);
+  --tx:#eef0f6;--mu:#7a8aaa;--dim:#252f45;
+  --ac:#63e2b7;--ac2:#63b3e2;--warn:#f5a623;--danger:#e05252;
+  --green:#4ade80;
+  --mono:'JetBrains Mono',monospace;--sans:'Inter',sans-serif;
+  --fz-xs:11px;--fz-sm:13px;--fz-md:14px;--fz-lg:16px;
+  --fz-mono-xs:11px;--fz-mono-sm:12px;--fz-mono-md:13px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tx);font-family:var(--sans);font-size:var(--fz-md);line-height:1.5;-webkit-font-smoothing:antialiased;}
+canvas{position:fixed;inset:0;width:100%!important;height:100%!important;}
+
+#topbar{position:fixed;top:0;left:0;right:0;height:54px;background:rgba(10,13,20,.98);border-bottom:1px solid var(--bd2);display:flex;align-items:center;z-index:50;gap:0;backdrop-filter:blur(20px);}
+.tb-logo{padding:0 18px;font-family:var(--mono);font-size:13px;font-weight:700;color:var(--ac);letter-spacing:.08em;border-right:1px solid var(--bd2);white-space:nowrap;}
+.tb-file{padding:0 16px;font-size:var(--fz-sm);color:var(--tx);border-right:1px solid var(--bd);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;}
+.tb-stat{padding:0 14px;font-family:var(--mono);font-size:var(--fz-mono-sm);color:var(--mu);border-right:1px solid var(--bd);white-space:nowrap;letter-spacing:.02em;}
+.tb-stat strong{color:var(--tx);font-weight:600;}
+.tb-actions{margin-left:auto;display:flex;align-items:center;gap:6px;padding:0 12px;}
+.tbtn{font-family:var(--mono);font-size:var(--fz-mono-sm);padding:6px 14px;border-radius:6px;cursor:pointer;border:1px solid var(--bd2);background:none;color:var(--mu);transition:.15s;white-space:nowrap;letter-spacing:.02em;}
+.tbtn:hover{color:var(--tx);border-color:var(--tx);}
+.tbtn.hi{background:var(--ac);color:#0a0d14;border-color:var(--ac);font-weight:700;}
+.tbtn.hi:hover{background:#7aebc5;}
+.tbtn.on{border-color:var(--ac2);color:var(--ac2);}
+
+/* drop screen */
+#drop-screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;z-index:40;background:var(--bg);}
+.grid-bg{position:fixed;inset:0;background-image:linear-gradient(rgba(74,240,200,.012) 1px,transparent 1px),linear-gradient(90deg,rgba(74,240,200,.012) 1px,transparent 1px);background-size:48px 48px;pointer-events:none;}
+.drop-box{width:280px;padding:40px 32px;border:1.5px dashed var(--dim);border-radius:16px;text-align:center;transition:.2s;}
+.drop-box.drag{border-color:var(--ac2);background:rgba(74,240,200,.03);}
+.drop-icon{font-size:40px;margin-bottom:16px;}
+.drop-title{font-family:var(--mono);font-size:var(--fz-mono-md);color:var(--tx);letter-spacing:.06em;margin-bottom:8px;font-weight:700;}
+.drop-fmts{display:flex;gap:6px;justify-content:center;margin:12px 0;}
+.fmt{font-family:var(--mono);font-size:var(--fz-mono-xs);padding:4px 12px;border-radius:99px;border:1px solid var(--bd2);color:var(--mu);letter-spacing:.04em;}
+.fmt.hi{border-color:rgba(99,226,183,.4);color:var(--ac);}
+.browse-btn{display:inline-block;margin-top:12px;font-family:var(--mono);font-size:var(--fz-mono-sm);padding:11px 32px;border-radius:8px;border:1px solid var(--ac);background:rgba(99,226,183,.06);color:var(--ac);cursor:pointer;transition:.2s;letter-spacing:.04em;font-weight:500;}
+.browse-btn:hover{background:rgba(99,226,183,.14);}
+#file-input{display:none;}
+
+/* progress */
+#prog-screen{position:fixed;inset:0;background:rgba(7,9,15,.97);z-index:60;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;}
+.prog-title{font-family:var(--mono);font-size:var(--fz-mono-md);color:var(--ac);letter-spacing:.1em;font-weight:700;}
+.prog-track{width:320px;height:4px;background:var(--dim);border-radius:99px;overflow:hidden;}
+.prog-bar{height:100%;background:linear-gradient(90deg,var(--ac),var(--ac2));width:0%;transition:width .25s;border-radius:99px;}
+.prog-msg{font-size:var(--fz-mono-sm);color:var(--mu);font-family:var(--mono);text-align:center;max-width:340px;margin-top:4px;}
+
+/* side */
+#side{position:fixed;top:54px;right:0;bottom:0;width:270px;background:rgba(10,13,20,.98);border-left:1px solid var(--bd2);z-index:30;display:none;flex-direction:column;overflow-y:auto;backdrop-filter:blur(20px);}
+.sec{padding:16px 18px;border-bottom:1px solid var(--bd);}
+.sec-title{font-family:var(--mono);font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:.14em;margin-bottom:12px;font-weight:500;}
+.row{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;}
+.lbl{font-size:var(--fz-sm);color:var(--tx);opacity:.8;}
+.val{font-family:var(--mono);font-size:var(--fz-mono-sm);color:var(--ac);font-weight:500;}
+input[type=range]{width:100%;accent-color:var(--ac);height:3px;margin:4px 0 12px;cursor:pointer;}
+.btn-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:4px;}
+.gbtn{font-family:var(--mono);font-size:var(--fz-mono-xs);padding:7px 6px;border-radius:5px;border:1px solid var(--bd2);background:none;color:var(--mu);cursor:pointer;transition:.15s;text-align:center;letter-spacing:.02em;}
+.gbtn:hover,.gbtn.on{border-color:var(--ac);color:var(--ac);background:rgba(99,226,183,.06);}
+.gbtn.ony{border-color:var(--ac2);color:var(--ac2);background:rgba(99,179,226,.06);}
+.tog-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.tog{position:relative;width:32px;height:17px;flex-shrink:0;}
+.tog input{opacity:0;width:0;height:0;}
+.tsl{position:absolute;inset:0;background:var(--dim);border-radius:99px;cursor:pointer;transition:.2s;}
+.tsl::before{content:'';position:absolute;height:11px;width:11px;left:3px;bottom:3px;background:#666;border-radius:50%;transition:.2s;}
+.tog input:checked+.tsl{background:var(--ac);}
+.tog input:checked+.tsl::before{transform:translateX(15px);background:#0a0d14;}
+.statgrid{display:grid;grid-template-columns:1fr 1fr;gap:4px;}
+.sbox{background:var(--s2);border:1px solid var(--bd);border-radius:6px;padding:9px 10px;}
+.slbl{font-size:10px;color:var(--mu);margin-bottom:3px;font-family:var(--mono);letter-spacing:.04em;text-transform:uppercase;}
+.snum{font-family:var(--mono);font-size:var(--fz-mono-sm);font-weight:700;color:var(--tx);}
+.mbox{background:var(--s2);border:1px solid var(--bd2);border-radius:6px;padding:12px;margin-top:8px;font-family:var(--mono);font-size:var(--fz-mono-md);text-align:center;color:var(--ac);min-height:40px;display:flex;align-items:center;justify-content:center;font-weight:500;}
+
+
+
+#hint{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:var(--fz-mono-xs);color:var(--mu);background:rgba(10,13,20,.9);border:1px solid var(--bd2);border-radius:99px;padding:7px 18px;pointer-events:none;display:none;white-space:nowrap;backdrop-filter:blur(12px);letter-spacing:.03em;}
+#toast{position:fixed;bottom:56px;left:50%;transform:translateX(-50%);background:var(--s2);border:1px solid var(--bd2);border-radius:8px;padding:10px 20px;font-family:var(--mono);font-size:var(--fz-mono-sm);color:var(--tx);z-index:80;display:none;white-space:nowrap;backdrop-filter:blur(12px);box-shadow:0 4px 24px rgba(0,0,0,.4);}
+#mcur{position:fixed;pointer-events:none;z-index:20;display:none;}
+#mcur::before,#mcur::after{content:'';position:absolute;background:var(--ac2);}
+#mcur::before{width:1px;height:18px;left:0;top:-9px;}
+#mcur::after{width:18px;height:1px;top:0;left:-9px;}
+::-webkit-scrollbar{width:3px;}
+::-webkit-scrollbar-thumb{background:var(--dim);border-radius:99px;}
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+
+<div id="topbar">
+  <div class="tb-logo">LIDAR<span style="color:var(--mu);font-weight:400;">+mesh</span></div>
+  <div class="tb-file" id="tb-file">No file loaded</div>
+  <div class="tb-stat" id="tb-s1" style="display:none"><strong id="s1v">—</strong></div>
+  <div class="tb-stat" id="tb-s2" style="display:none"><strong id="s2v">—</strong></div>
+  <div class="tb-actions">
+    <span id="mode-btns" style="display:none;gap:6px;align-items:center;display:none;">
+      <button class="tbtn on" id="pill-cloud" onclick="setMode('cloud')">☁ Cloud</button>
+      <button class="tbtn" id="pill-mesh" onclick="setMode('mesh')">◈ Mesh</button>
+    </span>
+    <button class="tbtn on" id="btn-measure" onclick="toggleMeasure()" style="display:none">📐 Measure</button>
+    <button class="tbtn" id="btn-reset" onclick="resetCam()" style="display:none">⟲ Reset</button>
+    <button class="tbtn hi" id="btn-share" onclick="openShareModal()" style="display:none">🔗 Share</button>
+    <button class="tbtn" id="btn-export" onclick="doExport()" style="display:none">↓ Export</button>
+    <button class="tbtn" id="btn-new" onclick="loadNew()" style="display:none">⏏ New</button>
+  </div>
+</div>
+
+<div id="drop-screen">
+  <div class="drop-box" id="drop-box">
+    <div class="drop-icon">🛰</div>
+    <div class="drop-title">DROP YOUR FILE HERE</div>
+    <div class="drop-fmts">
+      <span class="fmt hi">LAS</span>
+      <span class="fmt hi">PLY</span>
+      <span class="fmt">OBJ</span>
+    </div>
+    <button class="browse-btn" id="browse-btn">Browse files</button>
+    <input type="file" id="file-input" accept=".las,.LAS,.ply,.PLY,.obj,.OBJ">
+  </div>
+</div>
+
+<div id="prog-screen">
+  <div class="prog-title" id="prog-title">LOADING</div>
+  <div class="prog-track"><div class="prog-bar" id="prog-bar"></div></div>
+  <div class="prog-msg" id="prog-msg">Please wait…</div>
+</div>
+
+<canvas id="c"></canvas>
+
+<div id="side">
+    <div class="cvt-desc">Build a solid surface from the point cloud — no external software needed.</div>
+    <div class="cq">
+      <button class="cqbtn on" id="cq-fast" onclick="setQ('fast')">Fast</button>
+      <button class="cqbtn" id="cq-fine" onclick="setQ('fine')">Fine</button>
+    </div>
+    <button class="cvt-btn" id="cvt-btn" onclick="doConvert()">Build Mesh</button>
+    <div id="cvt-prog">
+      <div class="cp-track"><div class="cp-bar" id="cp-bar" style="width:0%"></div></div>
+      <div class="cp-msg" id="cp-msg"></div>
+    </div>
+  </div>
+
+  <!-- Cloud controls -->
+  <div id="cloud-sec">
+    <div class="sec">
+      <div class="sec-title">Colour</div>
+      <div class="btn-grid">
+        <button class="gbtn on" id="cm-rgb" onclick="setColour('rgb')">RGB</button>
+        <button class="gbtn" id="cm-z" onclick="setColour('z')">Height</button>
+        <button class="gbtn" id="cm-int" onclick="setColour('intensity')">Intensity</button>
+        <button class="gbtn" id="cm-flat" onclick="setColour('flat')">Flat</button>
+      </div>
+    </div>
+    <div class="sec">
+      <div class="sec-title">Display</div>
+      <div class="row"><span class="lbl">Point size</span><span class="val" id="v-pts">2</span></div>
+      <input type="range" min="1" max="10" step=".5" value="2" oninput="setPtSize(this.value)">
+      <div class="row"><span class="lbl">Brightness</span><span class="val" id="v-bri">1.0</span></div>
+      <input type="range" min=".2" max="3" step=".1" value="1" oninput="setBright(this.value)">
+    </div>
+  </div>
+
+  <!-- Mesh controls -->
+  <div id="mesh-sec" style="display:none;">
+    <div class="sec">
+      <div class="sec-title">Render</div>
+      <div class="btn-grid">
+        <button class="gbtn ony" id="rm-solid" onclick="setRM('solid')">Solid</button>
+        <button class="gbtn" id="rm-wire" onclick="setRM('wire')">Wireframe</button>
+        <button class="gbtn" id="rm-both" onclick="setRM('both')">Both</button>
+        <button class="gbtn" id="rm-norm" onclick="setRM('normals')">Normals</button>
+      </div>
+    </div>
+    <div class="sec">
+      <div class="sec-title">Lighting</div>
+      <div class="tog-row"><span class="lbl">Vertex colours</span>
+        <label class="tog"><input type="checkbox" id="tog-vc" checked onchange="setVC(this.checked)"><span class="tsl"></span></label>
+      </div>
+      <div class="tog-row"><span class="lbl">Shadows</span>
+        <label class="tog"><input type="checkbox" id="tog-sh" checked onchange="setSH(this.checked)"><span class="tsl"></span></label>
+      </div>
+      <div class="row"><span class="lbl">Light</span><span class="val" id="v-lgt">1.0</span></div>
+      <input type="range" min=".1" max="3" step=".1" value="1" oninput="setLight(this.value)">
+      <div class="row"><span class="lbl">Roughness</span><span class="val" id="v-rgh">0.7</span></div>
+      <input type="range" min="0" max="1" step=".05" value=".7" oninput="setRough(this.value)">
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="sec">
+    <div class="sec-title">Stats</div>
+    <div class="statgrid" id="statgrid"></div>
+  </div>
+
+  <!-- Measure -->
+  <div class="sec">
+    <div class="sec-title">Measure</div>
+    <div class="mbox" id="mbox">—</div>
+    <div style="font-size:11px;color:var(--mu);margin-top:7px;line-height:1.5;">Click Measure then click two points.</div>
+    <button class="tbtn" style="margin-top:8px;width:100%;font-size:10px;" onclick="clearMeasure()">Clear</button>
+  </div>
+
+  <!-- Info -->
+  <div class="sec">
+    <div class="sec-title">File Info</div>
+    <div id="finfo" style="font-family:var(--mono);font-size:var(--fz-mono-xs);color:var(--mu);line-height:2.2;"></div>
+  </div>
+</div>
+
+<div id="hint">🖱 Drag:orbit · Scroll:zoom · Right:pan · R:reset</div>
+<div id="share-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100;align-items:center;justify-content:center;"><div style="background:#0c1018;border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:28px;width:min(520px,90vw);position:relative;"><button onclick="closeShareModal()" style="position:absolute;top:14px;right:16px;background:none;border:none;color:#4e5e78;font-size:18px;cursor:pointer;">✕</button><div style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--ac2);margin-bottom:6px;">🔗 Share this scan</div><div style="font-size:12px;color:var(--mu);margin-bottom:18px;line-height:1.7;">Your file will be uploaded to <strong style="color:var(--tx)">GoFile.io</strong> — a free anonymous file host with no size limit. No account needed. Anyone with the link can view your scan in full 3D.</div>  <div style="display:flex;gap:8px;">
+    <input id="gofile-token" type="password" placeholder="Paste your GoFile API token here…"
+      style="flex:1;background:#111620;border:1px solid rgba(255,255,255,.1);border-radius:6px;padding:8px 12px;font-family:var(--mono);font-size:11px;color:var(--tx);outline:none;"
+      oninput="saveToken(this.value)">
+    <button onclick="toggleTokenVisibility()" id="tok-vis-btn"
+      style="background:none;border:1px solid rgba(255,255,255,.1);border-radius:6px;padding:8px 12px;color:var(--mu);cursor:pointer;font-size:12px;">👁</button>
+  </div>
+  <div id="token-status" style="font-size:10px;color:var(--mu);margin-top:4px;font-family:var(--mono);"></div>
+</div>
+<div id="share-status" style="font-family:var(--mono);font-size:12px;color:var(--mu);margin-bottom:12px;min-height:20px;"></div><div id="share-progress" style="display:none;margin-bottom:12px;">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+    <div id="share-prog-msg" style="font-family:var(--mono);font-size:11px;color:var(--mu);"></div>
+    <div id="share-prog-pct" style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--ac2);">0%</div>
+  </div>
+  <div style="height:6px;background:#1e2a3a;border-radius:99px;overflow:hidden;">
+    <div id="share-prog-bar" style="height:100%;background:linear-gradient(90deg,var(--ac2),var(--ac));width:0%;transition:width .3s;border-radius:99px;"></div>
+  </div>
+  <div id="share-prog-detail" style="font-family:var(--mono);font-size:10px;color:var(--mu);margin-top:5px;"></div>
+</div><div id="share-url-row" style="display:none;display:flex;gap:8px;align-items:center;margin-bottom:10px;"><input id="share-url-box" readonly style="flex:1;background:#111620;border:1px solid rgba(255,255,255,.1);border-radius:6px;padding:8px 12px;font-family:var(--mono);font-size:11px;color:var(--tx);outline:none;" value=""><button onclick="copyShareUrl()" id="copy-btn" style="background:var(--ac2);color:#07090f;font-family:var(--mono);font-size:11px;font-weight:700;border:none;border-radius:6px;padding:8px 14px;cursor:pointer;white-space:nowrap;">Copy</button></div><div id="share-note" style="font-size:11px;color:var(--mu);line-height:1.6;display:none;">✓ Link copied! The recipient opens this URL in their browser — the viewer loads automatically with your scan.<br><br><span style="color:#f0904a;">⚠ Free GoFile links may expire if not accessed for 10 days.</span></div>
+<div style="display:flex;gap:8px;margin-top:4px;">
+  <button id="share-upload-btn" onclick="startUpload()" style="flex:1;background:var(--ac2);color:#07090f;font-family:var(--mono);font-size:12px;font-weight:700;border:none;border-radius:7px;padding:10px;cursor:pointer;">Upload &amp; Generate Link</button>
+  <button id="share-cancel-btn" onclick="cancelUpload()" style="display:none;background:none;color:#ef4444;font-family:var(--mono);font-size:12px;font-weight:700;border:1px solid #ef4444;border-radius:7px;padding:10px 16px;cursor:pointer;">Cancel</button>
+</div></div></div>
+<div id="toast"></div>
+<div id="mcur"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+'use strict';
+let currentFileBlob = null;
+let currentFileExt = 'ply';
+let lastShareUrl = null;
+// ══════════════════════════════════════════════
+// GLOBALS
+// ══════════════════════════════════════════════
+let renderer, scene, camera, dirLight, ambLight, ground;
+let cloudMesh=null, solidMesh=null, wireMesh=null, mLine=null;
+let cloudData=null, meshBuilt=false;
+let viewMode='cloud', renderMode='solid', colourMode='rgb';
+let measureOn=false, mPt1=null;
+let ptSz=2, bright=1, lightInt=1, roughness=.7, useVC=true, useSH=true;
+
+// ══════════════════════════════════════════════
+// INIT THREE.JS
+// ══════════════════════════════════════════════
+function initThree(){
+  const canvas=document.getElementById('c');
+  renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false});
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  renderer.setSize(innerWidth,innerHeight);
+  renderer.shadowMap.enabled=true;
+  renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  renderer.outputEncoding=THREE.sRGBEncoding;
+  renderer.toneMapping=THREE.ACESFilmicToneMapping;
+
+  scene=new THREE.Scene();
+  scene.background=new THREE.Color(0x07090f);
+
+  camera=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,.001,1e6);
+  camera.position.set(0,5,20);
+
+  ambLight=new THREE.AmbientLight(0xffffff,.4);
+  scene.add(ambLight);
+
+  dirLight=new THREE.DirectionalLight(0xfff8e8,1);
+  dirLight.position.set(5,10,7);
+  dirLight.castShadow=true;
+  dirLight.shadow.mapSize.set(2048,2048);
+  dirLight.shadow.bias=-.001;
+  scene.add(dirLight);
+
+  const fl=new THREE.DirectionalLight(0xc8e8ff,.3);
+  fl.position.set(-5,3,-5);
+  scene.add(fl);
+
+  ground=new THREE.Mesh(
+    new THREE.PlaneGeometry(1000,1000),
+    new THREE.ShadowMaterial({opacity:.25})
+  );
+  ground.rotation.x=-Math.PI/2;
+  ground.receiveShadow=true;
+  ground.visible=false;
+  scene.add(ground);
+
+  setupOrbit();
+  setupMeasure();
+  (function loop(){requestAnimationFrame(loop);renderer.render(scene,camera);})();
+  window.addEventListener('resize',()=>{
+    camera.aspect=innerWidth/innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth,innerHeight);
+  });
+  window.addEventListener('keydown',e=>{
+    if(e.key==='r'||e.key==='R')resetCam();
+  });
+}
+
+// ══════════════════════════════════════════════
+// ORBIT
+// ══════════════════════════════════════════════
+const O={act:false,rgt:false,lx:0,ly:0,t:.5,p:1,r:20,tx:0,ty:0,tz:0};
+function uc(){
+  camera.position.set(
+    O.tx+O.r*Math.sin(O.p)*Math.sin(O.t),
+    O.ty+O.r*Math.cos(O.p),
+    O.tz+O.r*Math.sin(O.p)*Math.cos(O.t)
+  );
+  camera.lookAt(O.tx,O.ty,O.tz);
+}
+function setupOrbit(){
+  const el=renderer.domElement;
+  el.addEventListener('mousedown',e=>{O.act=true;O.rgt=(e.button===2);O.lx=e.clientX;O.ly=e.clientY;});
+  el.addEventListener('contextmenu',e=>e.preventDefault());
+  window.addEventListener('mouseup',()=>O.act=false);
+  window.addEventListener('mousemove',e=>{
+    if(!O.act||measureOn)return;
+    const dx=e.clientX-O.lx,dy=e.clientY-O.ly;
+    O.lx=e.clientX;O.ly=e.clientY;
+    if(O.rgt){
+      const s=O.r*.001;
+      const r=new THREE.Vector3();
+      r.crossVectors(camera.getWorldDirection(new THREE.Vector3()),camera.up).normalize();
+      const u=camera.up.clone();
+      O.tx-=r.x*dx*s-u.x*dy*s;
+      O.ty-=r.y*dx*s-u.y*dy*s;
+      O.tz-=r.z*dx*s-u.z*dy*s;
+    }else{
+      O.t-=dx*.005;
+      O.p=Math.max(.02,Math.min(Math.PI-.02,O.p-dy*.005));
+    }
+    uc();
+  });
+  el.addEventListener('wheel',e=>{
+    O.r=Math.max(.01,Math.min(1e5,O.r*(1+e.deltaY*.001)));
+    uc();
+  },{passive:true});
+  let ts=[];
+  el.addEventListener('touchstart',e=>{ts=[...e.touches];});
+  el.addEventListener('touchmove',e=>{
+    e.preventDefault();
+    if(e.touches.length===1){
+      O.t-=(e.touches[0].clientX-ts[0].clientX)*.006;
+      O.p=Math.max(.02,Math.min(Math.PI-.02,O.p-(e.touches[0].clientY-ts[0].clientY)*.006));
+    }else if(e.touches.length===2){
+      const d0=Math.hypot(ts[0].clientX-ts[1].clientX,ts[0].clientY-ts[1].clientY);
+      const d1=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+      O.r=Math.max(.01,Math.min(1e5,O.r*d0/d1));
+    }
+    ts=[...e.touches];uc();
+  },{passive:false});
+}
+function resetCam(){
+  if(!cloudData)return;
+  const b=cloudData.bounds;
+  const span=Math.max(b.xMax-b.xMin,b.yMax-b.yMin,b.zMax-b.zMin)||10;
+  O.tx=0;O.ty=0;O.tz=0;O.t=.5;O.p=1;O.r=span*1.4;
+  camera.near=span*.0001;camera.far=span*200;
+  camera.updateProjectionMatrix();
+  dirLight.position.set(span,span*1.5,span*.8);
+  dirLight.shadow.camera.left=-span*2;dirLight.shadow.camera.right=span*2;
+  dirLight.shadow.camera.top=span*2;dirLight.shadow.camera.bottom=-span*2;
+  dirLight.shadow.camera.far=span*10;
+  dirLight.shadow.camera.updateProjectionMatrix();
+  ground.position.y=b.yMin;
+  ground.visible=useSH&&viewMode==='mesh';
+  uc();
+}
+
+// ══════════════════════════════════════════════
+// LAS PARSER
+// ══════════════════════════════════════════════
+async function parseLAS(buf,name){
+  const v=new DataView(buf);
+  const sig=String.fromCharCode(v.getUint8(0),v.getUint8(1),v.getUint8(2),v.getUint8(3));
+  if(sig!=='LASF')throw new Error('Not a LiDAR LAS file.\n\nIf this is a well-log LAS file it uses a different format.');
+  const vMin=v.getUint8(25);
+  const offPts=v.getUint32(96,true);
+  const ptFmt=v.getUint8(104);
+  const ptLen=v.getUint16(105,true);
+  let total=vMin>=4?(v.getUint32(251,true)*4294967296+v.getUint32(247,true)):v.getUint32(107,true);
+  if(!total)throw new Error('LAS file has 0 points.');
+  const sx=v.getFloat64(131,true),sy=v.getFloat64(139,true),sz=v.getFloat64(147,true);
+  const ox=v.getFloat64(155,true),oy=v.getFloat64(163,true),oz=v.getFloat64(171,true);
+  const hasRGB=[2,3,5,7,8,10].includes(ptFmt);
+  const rOff={2:20,3:28,5:28,7:30,8:30,10:30}[ptFmt]||0;
+  const MAX=5000000;
+  const step=Math.max(1,Math.floor(total/MAX));
+  const n=Math.min(Math.floor(total/step)+1,MAX);
+  prog(20,`${total.toLocaleString()} pts · every ${step}th → ${n.toLocaleString()}`);
+  await tick();
+  const pos=new Float32Array(n*3),col=new Float32Array(n*3),ins=new Float32Array(n);
+  let bd={xMin:1e18,xMax:-1e18,yMin:1e18,yMax:-1e18,zMin:1e18,zMax:-1e18};
+  let pi=0;
+  for(let i=0;i<total&&pi<n;i+=step){
+    const bo=offPts+i*ptLen;
+    if(bo+ptLen>buf.byteLength)break;
+    const x=v.getInt32(bo,true)*sx+ox,y=v.getInt32(bo+4,true)*sy+oy,z=v.getInt32(bo+8,true)*sz+oz;
+    const intensity=v.getUint16(bo+12,true);
+    if(x<bd.xMin)bd.xMin=x;if(x>bd.xMax)bd.xMax=x;
+    if(y<bd.yMin)bd.yMin=y;if(y>bd.yMax)bd.yMax=y;
+    if(z<bd.zMin)bd.zMin=z;if(z>bd.zMax)bd.zMax=z;
+    pos[pi*3]=x;pos[pi*3+1]=y;pos[pi*3+2]=z;
+    ins[pi]=intensity/65535;
+    if(hasRGB&&rOff){col[pi*3]=v.getUint16(bo+rOff,true)/65535;col[pi*3+1]=v.getUint16(bo+rOff+2,true)/65535;col[pi*3+2]=v.getUint16(bo+rOff+4,true)/65535;}
+    else{col[pi*3]=col[pi*3+1]=col[pi*3+2]=ins[pi];}
+    pi++;
+    if(pi%400000===0){prog(20+pi/n*70,`Parsed ${pi.toLocaleString()}…`);await tick();}
+  }
+  const cx=(bd.xMin+bd.xMax)/2,cy=(bd.yMin+bd.yMax)/2,cz=(bd.zMin+bd.zMax)/2;
+  for(let i=0;i<pi;i++){pos[i*3]-=cx;pos[i*3+1]-=cy;pos[i*3+2]-=cz;}
+  return{
+    pos:pos.slice(0,pi*3),col:col.slice(0,pi*3),ins:ins.slice(0,pi),
+    bounds:{xMin:bd.xMin-cx,xMax:bd.xMax-cx,yMin:bd.yMin-cy,yMax:bd.yMax-cy,zMin:bd.zMin-cz,zMax:bd.zMax-cz},
+    rawBounds:bd,hasRGB,totalPoints:total,loadedPoints:pi,step,
+    ptFmt,vMin,name,sizeMB:(buf.byteLength/1048576).toFixed(1)
+  };
+}
+
+// ══════════════════════════════════════════════
+// PLY PARSER
+// ══════════════════════════════════════════════
+function parsePLY(buf){
+  // Read header as text
+  const headBytes=new Uint8Array(buf,0,Math.min(4096,buf.byteLength));
+  let headerStr='';
+  for(let i=0;i<headBytes.length;i++)headerStr+=String.fromCharCode(headBytes[i]);
+
+  if(!headerStr.startsWith('ply'))throw new Error('Not a PLY file.');
+
+  const isBin=headerStr.includes('binary');
+  const isLE=headerStr.includes('binary_little_endian');
+
+  // Find end_header byte position
+  const enc=new TextEncoder();
+  const arr=new Uint8Array(buf);
+  let dataStart=-1;
+  // Try \r\n then \n
+  for(const tag of['end_header\r\n','end_header\n']){
+    const tb=enc.encode(tag);
+    for(let i=0;i<Math.min(arr.length,8192);i++){
+      let ok=true;
+      for(let j=0;j<tb.length;j++){if(arr[i+j]!==tb[j]){ok=false;break;}}
+      if(ok){dataStart=i+tb.length;break;}
+    }
+    if(dataStart>=0)break;
+  }
+  if(dataStart<0)throw new Error('PLY end_header not found.');
+
+  // Parse header lines
+  const hLines=headerStr.split(/\r?\n/).map(l=>l.trim());
+  let vertCount=0,faceCount=0;
+  const vProps=[];
+  let inV=false,inF=false;
+  for(const l of hLines){
+    if(l.startsWith('element vertex')){vertCount=parseInt(l.split(/\s+/)[2]);inV=true;inF=false;}
+    else if(l.startsWith('element face')){faceCount=parseInt(l.split(/\s+/)[2]);inF=true;inV=false;}
+    else if(l.startsWith('property')&&inV){
+      const p=l.split(/\s+/);
+      vProps.push({type:p[1],name:p[p.length-1]});
+    }
+  }
+  if(!vertCount)throw new Error('PLY has 0 vertices.');
+
+  const TS={char:1,uchar:1,int8:1,uint8:1,short:2,ushort:2,int16:2,uint16:2,int:4,uint:4,int32:4,uint32:4,float:4,float32:4,double:8,float64:8};
+
+  const posA=[],normA=[],colA=[],idxA=[];
+
+  if(isBin){
+    const dv=new DataView(buf,dataStart);
+    let off=0;
+    const rd=(type,o)=>{
+      switch(type){
+        case'float':case'float32':return dv.getFloat32(o,isLE);
+        case'double':case'float64':return dv.getFloat64(o,isLE);
+        case'uchar':case'uint8':return dv.getUint8(o);
+        case'char':case'int8':return dv.getInt8(o);
+        case'ushort':case'uint16':return dv.getUint16(o,isLE);
+        case'short':case'int16':return dv.getInt16(o,isLE);
+        case'int':case'int32':return dv.getInt32(o,isLE);
+        case'uint':case'uint32':return dv.getUint32(o,isLE);
+        default:return dv.getFloat32(o,isLE);
+      }
+    };
+    for(let i=0;i<vertCount;i++){
+      for(const p of vProps){
+        const val=rd(p.type,off);
+        const isU=p.type==='uchar'||p.type==='uint8';
+        const n=p.name;
+        if(n==='x')posA.push(val,0,0);
+        else if(n==='y'){if(posA.length)posA[posA.length-2]=val;}
+        else if(n==='z'){if(posA.length)posA[posA.length-1]=val;}
+        else if(n==='nx')normA.push(val,0,0);
+        else if(n==='ny'){if(normA.length)normA[normA.length-2]=val;}
+        else if(n==='nz'){if(normA.length)normA[normA.length-1]=val;}
+        else if(n==='red'||n==='r'||n==='diffuse_red')colA.push(isU?val/255:val,0,0);
+        else if(n==='green'||n==='g'||n==='diffuse_green'){if(colA.length)colA[colA.length-2]=isU?val/255:val;}
+        else if(n==='blue'||n==='b'||n==='diffuse_blue'){if(colA.length)colA[colA.length-1]=isU?val/255:val;}
+        off+=TS[p.type]||4;
+      }
+    }
+    for(let i=0;i<faceCount;i++){
+      const cnt=dv.getUint8(off);off++;
+      const vi=[];
+      for(let j=0;j<cnt;j++){vi.push(dv.getInt32(off,isLE));off+=4;}
+      for(let j=1;j<vi.length-1;j++)idxA.push(vi[0],vi[j],vi[j+1]);
+    }
+  }else{
+    // ASCII PLY
+    const txt=new TextDecoder().decode(buf);
+    const dataStr=txt.substring(txt.search(/end_header\r?\n/)+txt.match(/end_header\r?\n/)[0].length);
+    const lines=dataStr.trim().split(/\r?\n/);
+    let li=0;
+    for(let i=0;i<vertCount&&li<lines.length;i++,li++){
+      const vals=lines[li].trim().split(/\s+/).map(Number);
+      const get=name=>{const idx=vProps.findIndex(p=>p.name===name);return idx>=0&&idx<vals.length?vals[idx]:0;};
+      posA.push(get('x'),get('y'),get('z'));
+      const rp=vProps.find(p=>['red','r','diffuse_red'].includes(p.name));
+      if(rp){
+        const isU=rp.type==='uchar'||rp.type==='uint8';const d=isU?255:1;
+        const ri=vProps.findIndex(p=>['red','r','diffuse_red'].includes(p.name));
+        const gi=vProps.findIndex(p=>['green','g','diffuse_green'].includes(p.name));
+        const bi=vProps.findIndex(p=>['blue','b','diffuse_blue'].includes(p.name));
+        colA.push(ri>=0?vals[ri]/d:0,gi>=0?vals[gi]/d:0,bi>=0?vals[bi]/d:0);
+      }
+      if(vProps.some(p=>p.name==='nx'))normA.push(get('nx'),get('ny'),get('nz'));
+    }
+    for(let i=0;i<faceCount&&li<lines.length;i++,li++){
+      const vals=lines[li].trim().split(/\s+/).map(Number);
+      for(let j=1;j<vals[0]-1;j++)idxA.push(vals[1],vals[j+1],vals[j+2]);
+    }
+  }
+
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(posA),3));
+  if(colA.length===posA.length)geo.setAttribute('color',new THREE.BufferAttribute(new Float32Array(colA),3));
+  if(normA.length===posA.length)geo.setAttribute('normal',new THREE.BufferAttribute(new Float32Array(normA),3));
+  if(idxA.length)geo.setIndex(idxA);
+  if(!normA.length)geo.computeVertexNormals();
+  return{geo,hasColors:colA.length>0,vertCount,faceCount:idxA.length?idxA.length/3:posA.length/9};
+}
+
+// ══════════════════════════════════════════════
+// OBJ PARSER
+// ══════════════════════════════════════════════
+function parseOBJ(txt){
+  const verts=[],norms=[],cols=[],posA=[],normA=[],colA=[];
+  let hasC=false;
+  for(const raw of txt.split('\n')){
+    const l=raw.trim();
+    if(l.startsWith('v ')){
+      const p=l.split(/\s+/);
+      verts.push(+p[1],+p[2],+p[3]);
+      if(p.length>=7){cols.push(+p[4],+p[5],+p[6]);hasC=true;}else cols.push(1,1,1);
+    }else if(l.startsWith('vn ')){const p=l.split(/\s+/);norms.push(+p[1],+p[2],+p[3]);}
+    else if(l.startsWith('f ')){
+      const p=l.split(/\s+/).slice(1);
+      for(let i=1;i<p.length-1;i++){
+        for(const idx of[0,i,i+1]){
+          const parts=p[idx].split('/');
+          const vi=parseInt(parts[0])-1;
+          const ni=parts[2]?parseInt(parts[2])-1:-1;
+          posA.push(verts[vi*3]??0,verts[vi*3+1]??0,verts[vi*3+2]??0);
+          if(hasC)colA.push(cols[vi*3]??1,cols[vi*3+1]??1,cols[vi*3+2]??1);
+          if(ni>=0&&norms[ni*3+2]!==undefined)normA.push(norms[ni*3],norms[ni*3+1],norms[ni*3+2]);
+        }
+      }
+    }
+  }
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(posA),3));
+  if(hasC&&colA.length)geo.setAttribute('color',new THREE.BufferAttribute(new Float32Array(colA),3));
+  if(normA.length)geo.setAttribute('normal',new THREE.BufferAttribute(new Float32Array(normA),3));
+  if(!normA.length)geo.computeVertexNormals();
+  return{geo,hasColors:hasC&&colA.length>0,vertCount:verts.length/3,faceCount:posA.length/9};
+}
+
+// ══════════════════════════════════════════════
+// BUILD SCENE OBJECTS
+// ══════════════════════════════════════════════
+function buildCloud(data){
+  if(cloudMesh){scene.remove(cloudMesh);cloudMesh.geometry.dispose();cloudMesh.material.dispose();}
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.BufferAttribute(data.pos,3));
+  geo.setAttribute('color',new THREE.BufferAttribute(data.col,3));
+  geo.setAttribute('intensity',new THREE.BufferAttribute(data.ins,1));
+  const b=data.bounds,zR=b.zMax-b.zMin||1;
+  const hc=new Float32Array(data.pos.length);
+  for(let i=0;i<data.loadedPoints;i++){
+    const t=(data.pos[i*3+2]-b.zMin)/zR;
+    hc[i*3]=Math.max(0,Math.min(1,t<.5?0:(t-.5)*2));
+    hc[i*3+1]=Math.max(0,Math.min(1,t<.5?t*2:1-(t-.5)*2));
+    hc[i*3+2]=Math.max(0,Math.min(1,t<.5?1-t*2:0));
+  }
+  geo.setAttribute('heightColor',new THREE.BufferAttribute(hc,3));
+  const mat=new THREE.ShaderMaterial({
+    vertexColors:true,uniforms:{uM:{value:0},uS:{value:ptSz},uB:{value:bright}},
+    vertexShader:`attribute vec3 heightColor;attribute float intensity;uniform float uM,uS,uB;varying vec3 vC;
+    void main(){if(uM<.5)vC=color*uB;else if(uM<1.5)vC=heightColor*uB;else if(uM<2.5)vC=vec3(intensity)*uB;else vC=vec3(0,.9,1)*uB;gl_PointSize=uS;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
+    fragmentShader:`varying vec3 vC;void main(){vec2 u=gl_PointCoord-.5;if(dot(u,u)>.25)discard;gl_FragColor=vec4(clamp(vC,0.,1.),1.);}`
+  });
+  cloudMesh=new THREE.Points(geo,mat);
+  scene.add(cloudMesh);
+}
+
+function buildMeshObj(geo,hasRGB){
+  [solidMesh,wireMesh].forEach(m=>{if(m){scene.remove(m);m.geometry.dispose();m.material&&m.material.dispose&&m.material.dispose();}});
+  const mat=new THREE.MeshStandardMaterial({vertexColors:hasRGB&&useVC,color:0xc8d0e0,roughness,metalness:0,side:THREE.DoubleSide});
+  solidMesh=new THREE.Mesh(geo,mat);solidMesh.castShadow=true;solidMesh.receiveShadow=true;scene.add(solidMesh);
+  wireMesh=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({color:0x4af0c8,wireframe:true,transparent:true,opacity:.1}));
+  wireMesh.visible=false;scene.add(wireMesh);
+  ground.visible=useSH;
+  meshBuilt=true;
+}
+
+// ══════════════════════════════════════════════
+// VIEW / RENDER CONTROLS
+// ══════════════════════════════════════════════
+function setMode(m){
+  viewMode=m;
+  if(cloudMesh)cloudMesh.visible=m==='cloud';
+  if(solidMesh)solidMesh.visible=m==='mesh'&&(renderMode==='solid'||renderMode==='both');
+  if(wireMesh)wireMesh.visible=m==='mesh'&&(renderMode==='wire'||renderMode==='both');
+  ground.visible=m==='mesh'&&useSH;
+  document.getElementById('pill-cloud').className='tbtn'+(m==='cloud'?' on':'');
+  document.getElementById('pill-mesh').className='tbtn'+(m==='mesh'?' on':'');
+  document.getElementById('cloud-sec').style.display=m==='cloud'?'':'none';
+  document.getElementById('mesh-sec').style.display=m==='mesh'&&meshBuilt?'':'none';
+  
+}
+function setColour(m){
+  colourMode=m;
+  ['rgb','z','int','flat'].forEach(x=>document.getElementById('cm-'+x).classList.remove('on'));
+  document.getElementById('cm-'+{rgb:'rgb',z:'z',intensity:'int',flat:'flat'}[m]).classList.add('on');
+  if(cloudMesh)cloudMesh.material.uniforms.uM.value={rgb:0,z:1,intensity:2,flat:3}[m];
+}
+function setPtSize(v){ptSz=+v;document.getElementById('v-pts').textContent=parseFloat(v).toFixed(1);if(cloudMesh)cloudMesh.material.uniforms.uS.value=ptSz;}
+function setBright(v){bright=+v;document.getElementById('v-bri').textContent=parseFloat(v).toFixed(1);if(cloudMesh)cloudMesh.material.uniforms.uB.value=bright;}
+function setRM(m){
+  renderMode=m;
+  ['solid','wire','both','norm'].forEach(x=>document.getElementById('rm-'+x).classList.remove('ony'));
+  document.getElementById('rm-'+m).classList.add('ony');
+  if(!solidMesh||viewMode!=='mesh')return;
+  if(m==='normals'){solidMesh.material=new THREE.MeshNormalMaterial({side:THREE.DoubleSide});solidMesh.visible=true;wireMesh.visible=false;}
+  else{
+    solidMesh.material=new THREE.MeshStandardMaterial({vertexColors:cloudData&&cloudData.hasRGB&&useVC,color:0xc8d0e0,roughness,metalness:0,side:THREE.DoubleSide});
+    solidMesh.castShadow=true;solidMesh.receiveShadow=true;
+    solidMesh.visible=m==='solid'||m==='both';wireMesh.visible=m==='wire'||m==='both';
+  }
+}
+function setVC(on){useVC=on;if(solidMesh&&solidMesh.material.isMeshStandardMaterial){solidMesh.material.vertexColors=cloudData&&cloudData.hasRGB&&on;solidMesh.material.needsUpdate=true;}}
+function setSH(on){useSH=on;renderer.shadowMap.enabled=on;ground.visible=on&&viewMode==='mesh';}
+function setLight(v){lightInt=+v;dirLight.intensity=+v;document.getElementById('v-lgt').textContent=parseFloat(v).toFixed(1);}
+function setRough(v){roughness=+v;document.getElementById('v-rgh').textContent=parseFloat(v).toFixed(2);if(solidMesh&&solidMesh.material.isMeshStandardMaterial){solidMesh.material.roughness=+v;solidMesh.material.needsUpdate=true;}}
+
+// ══════════════════════════════════════════════
+// MEASURE
+// ══════════════════════════════════════════════
+function setupMeasure(){
+  const el=renderer.domElement;
+  el.addEventListener('click',e=>{
+    if(!measureOn)return;
+    const pt=pickPt(e.clientX,e.clientY);
+    if(!pt){toast('No point found — click on the cloud or mesh');return;}
+    if(!mPt1){
+      mPt1=pt;
+      document.getElementById('mbox').textContent='Click second point…';
+      document.getElementById('mbox').style.color='var(--warn)';
+    }else{
+      const d=mPt1.distanceTo(pt);
+      document.getElementById('mbox').textContent=d.toFixed(4)+' m';
+      document.getElementById('mbox').style.color='var(--ac2)';
+      if(mLine){scene.remove(mLine);mLine.geometry.dispose();}
+      mLine=new THREE.Line(new THREE.BufferGeometry().setFromPoints([mPt1,pt]),new THREE.LineBasicMaterial({color:0x4af0c8}));
+      scene.add(mLine);mPt1=null;toggleMeasure();
+    }
+  });
+  el.addEventListener('mousemove',e=>{
+    const c=document.getElementById('mcur');
+    if(measureOn){c.style.display='block';c.style.left=e.clientX+'px';c.style.top=e.clientY+'px';}
+    else c.style.display='none';
+  });
+}
+function pickPt(mx,my){
+  const rect=renderer.domElement.getBoundingClientRect();
+  const ndc=new THREE.Vector2(((mx-rect.left)/rect.width)*2-1,-((my-rect.top)/rect.height)*2+1);
+  const ray=new THREE.Raycaster();ray.setFromCamera(ndc,camera);
+  const tgts=[];
+  if(cloudMesh&&cloudMesh.visible){ray.params.Points.threshold=O.r*.015;tgts.push(cloudMesh);}
+  if(solidMesh&&solidMesh.visible)tgts.push(solidMesh);
+  const hits=ray.intersectObjects(tgts,true);
+  return hits.length?hits[0].point.clone():null;
+}
+function toggleMeasure(){
+  measureOn=!measureOn;mPt1=null;
+  document.getElementById('btn-measure').classList.toggle('on',measureOn);
+  if(measureOn){document.getElementById('mbox').textContent='Click first point…';document.getElementById('mbox').style.color='var(--warn)';}
+  document.getElementById('mcur').style.display=measureOn?'block':'none';
+}
+function clearMeasure(){
+  mPt1=null;
+  if(mLine){scene.remove(mLine);mLine.geometry.dispose();mLine=null;}
+  document.getElementById('mbox').textContent='—';
+  document.getElementById('mbox').style.color='var(--ac2)';
+  if(measureOn)toggleMeasure();
+}
+
+// ══════════════════════════════════════════════
+// VOXEL MESH CONVERSION
+// ══════════════════════════════════════════════
+
+// ══════════════════════════════════════════════
+// EXPORT
+// ══════════════════════════════════════════════
+function doExport(){
+  const isMesh=viewMode==='mesh'&&meshBuilt&&solidMesh;
+  const fname=cloudData.name.replace(/\.[^.]+$/,'')+(isMesh?'_mesh':'_cloud')+'_snapshot.html';
+  let html;
+  if(isMesh){
+    const g=solidMesh.geometry;
+    const pos=Array.from(g.attributes.position.array);
+    const norm=g.attributes.normal?Array.from(g.attributes.normal.array):null;
+    const col=g.attributes.color?Array.from(g.attributes.color.array):null;
+    html=meshSnap({pos,norm,col,name:cloudData.name});
+  }else{
+    const d=cloudData,MAX=500000,s=Math.max(1,Math.floor(d.loadedPoints/MAX)),n=Math.floor(d.loadedPoints/s);
+    const pos=[],col=[];
+    for(let i=0;i<n;i++){const j=i*s;pos.push(d.pos[j*3],d.pos[j*3+1],d.pos[j*3+2]);col.push(d.col[j*3],d.col[j*3+1],d.col[j*3+2]);}
+    html=cloudSnap({n,pos,col,name:cloudData.name,bounds:cloudData.bounds});
+  }
+  const a=document.createElement('a');
+  a.href='data:text/html;charset=utf-8,'+encodeURIComponent(html);
+  a.download=fname;
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  toast('Snapshot saved — share the HTML file!');
+}
+
+function cloudSnap(d){return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${d.name}</title><style>*{margin:0;padding:0;}body{background:#07090f;overflow:hidden;}#ui{position:fixed;top:12px;right:12px;background:rgba(7,9,15,.9);border:1px solid rgba(255,255,255,.07);border-radius:7px;padding:12px 14px;font-family:monospace;font-size:10px;color:#4e5e78;display:flex;flex-direction:column;gap:8px;}label{display:flex;align-items:center;justify-content:space-between;gap:10px;}input[type=range]{width:80px;accent-color:#4af0c8;}#info{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);font-family:monospace;font-size:9px;color:#2e3e58;background:rgba(7,9,15,.7);padding:4px 14px;border-radius:99px;}</style></head><body><canvas id="c"></canvas><div id="ui"><div style="color:#4af0c8;font-weight:700;">${d.name}</div><label>Size<input type="range" id="ps" min="1" max="8" step=".5" value="2"></label><label>Bright<input type="range" id="br" min=".2" max="3" step=".1" value="1"></label></div><div id="info">Drag:orbit · Scroll:zoom · Right:pan · ${d.n.toLocaleString()} pts</div><script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script><script>const D=${JSON.stringify(d)};const r=new THREE.WebGLRenderer({canvas:document.getElementById('c'),antialias:false});r.setSize(innerWidth,innerHeight);r.setPixelRatio(Math.min(devicePixelRatio,2));const sc=new THREE.Scene();sc.background=new THREE.Color(0x07090f);const b=D.bounds||{xMin:-10,xMax:10,yMin:-10,yMax:10,zMin:-10,zMax:10};const span=Math.max(b.xMax-b.xMin,b.yMax-b.yMin,b.zMax-b.zMin)||20;const cam=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,span*.0001,span*200);const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(D.pos),3));geo.setAttribute('color',new THREE.BufferAttribute(new Float32Array(D.col),3));const mat=new THREE.ShaderMaterial({vertexColors:true,uniforms:{uS:{value:2},uB:{value:1}},vertexShader:\`uniform float uS,uB;varying vec3 vC;void main(){vC=color*uB;gl_PointSize=uS;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}\`,fragmentShader:\`varying vec3 vC;void main(){vec2 u=gl_PointCoord-.5;if(dot(u,u)>.25)discard;gl_FragColor=vec4(clamp(vC,0.,1.),1.);}\`});sc.add(new THREE.Points(geo,mat));document.getElementById('ps').oninput=e=>mat.uniforms.uS.value=+e.target.value;document.getElementById('br').oninput=e=>mat.uniforms.uB.value=+e.target.value;let O={t:.5,p:1,r:span*1.4,tx:0,ty:0,tz:0,act:false,rgt:false,lx:0,ly:0};function uc(){cam.position.set(O.tx+O.r*Math.sin(O.p)*Math.sin(O.t),O.ty+O.r*Math.cos(O.p),O.tz+O.r*Math.sin(O.p)*Math.cos(O.t));cam.lookAt(O.tx,O.ty,O.tz);}document.addEventListener('mousedown',e=>{O.act=true;O.rgt=(e.button===2);O.lx=e.clientX;O.ly=e.clientY;});document.addEventListener('contextmenu',e=>e.preventDefault());document.addEventListener('mouseup',()=>O.act=false);document.addEventListener('mousemove',e=>{if(!O.act)return;const dx=e.clientX-O.lx,dy=e.clientY-O.ly;O.lx=e.clientX;O.ly=e.clientY;if(O.rgt){const s=O.r*.001,rv=new THREE.Vector3();rv.crossVectors(cam.getWorldDirection(new THREE.Vector3()),cam.up).normalize();O.tx-=rv.x*dx*s;O.ty-=rv.y*dx*s;O.tz-=rv.z*dx*s;}else{O.t-=dx*.005;O.p=Math.max(.02,Math.min(Math.PI-.02,O.p-dy*.005));}uc();});document.addEventListener('wheel',e=>{O.r=Math.max(.01,Math.min(1e5,O.r*(1+e.deltaY*.001)));uc();},{passive:true});window.addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();r.setSize(innerWidth,innerHeight);});uc();(function loop(){requestAnimationFrame(loop);r.render(sc,cam);})();<\/script></body></html>`;}
+
+function meshSnap(d){return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${d.name} mesh</title><style>*{margin:0;padding:0;}body{background:#07090f;overflow:hidden;}#ui{position:fixed;top:12px;right:12px;background:rgba(7,9,15,.9);border:1px solid rgba(255,255,255,.07);border-radius:7px;padding:12px 14px;font-family:monospace;font-size:10px;color:#4e5e78;display:flex;flex-direction:column;gap:8px;}label{display:flex;align-items:center;justify-content:space-between;gap:10px;}input[type=range]{width:80px;accent-color:#e8f04a;}select{background:#111620;border:1px solid rgba(255,255,255,.1);color:#dde4f0;padding:2px 5px;border-radius:4px;font-family:monospace;font-size:10px;}#info{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);font-family:monospace;font-size:9px;color:#2e3e58;background:rgba(7,9,15,.7);padding:4px 14px;border-radius:99px;}</style></head><body><canvas id="c"></canvas><div id="ui"><div style="color:#e8f04a;font-weight:700;">${d.name}</div><label>Rough<input type="range" id="rg" min="0" max="1" step=".05" value=".7"></label><label>Light<input type="range" id="lt" min=".1" max="3" step=".1" value="1"></label><label>Ambient<input type="range" id="am" min="0" max="1" step=".05" value=".4"></label><label>Mode<select id="md"><option value="s">Solid</option><option value="w">Wire</option><option value="b">Both</option></select></label></div><div id="info">Drag:orbit · Scroll:zoom · Right:pan</div><script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script><script>const D=${JSON.stringify(d)};const r=new THREE.WebGLRenderer({canvas:document.getElementById('c'),antialias:true});r.setSize(innerWidth,innerHeight);r.setPixelRatio(Math.min(devicePixelRatio,2));r.shadowMap.enabled=true;r.outputEncoding=THREE.sRGBEncoding;r.toneMapping=THREE.ACESFilmicToneMapping;const sc=new THREE.Scene();sc.background=new THREE.Color(0x07090f);const cam=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,.001,1e6);const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(D.pos),3));if(D.norm)geo.setAttribute('normal',new THREE.BufferAttribute(new Float32Array(D.norm),3));if(D.col)geo.setAttribute('color',new THREE.BufferAttribute(new Float32Array(D.col),3));if(!D.norm)geo.computeVertexNormals();const hasVC=!!D.col;const mat=new THREE.MeshStandardMaterial({vertexColors:hasVC,color:hasVC?0xffffff:0xc8d0e0,roughness:.7,metalness:0,side:THREE.DoubleSide});const mesh=new THREE.Mesh(geo,mat);mesh.castShadow=true;mesh.receiveShadow=true;sc.add(mesh);const wm=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({color:0x4af0c8,wireframe:true,transparent:true,opacity:.1}));wm.visible=false;sc.add(wm);const box=new THREE.Box3().setFromObject(mesh);const cv=new THREE.Vector3();box.getCenter(cv);const sv=new THREE.Vector3();box.getSize(sv);const span=Math.max(sv.x,sv.y,sv.z)||20;const al=new THREE.AmbientLight(0xffffff,.4);sc.add(al);const dl=new THREE.DirectionalLight(0xfff8e8,1);dl.position.set(span,span*1.5,span*.8);dl.castShadow=true;sc.add(dl);sc.add(new THREE.DirectionalLight(0xc8e8ff,.3)).position.set(-span,span*.3,-span);const gm=new THREE.Mesh(new THREE.PlaneGeometry(span*20,span*20),new THREE.ShadowMaterial({opacity:.2}));gm.rotation.x=-Math.PI/2;gm.position.y=box.min.y;gm.receiveShadow=true;sc.add(gm);cam.near=span*.001;cam.far=span*200;cam.updateProjectionMatrix();let O={t:.5,p:1,r:span*2,tx:cv.x,ty:cv.y,tz:cv.z,act:false,rgt:false,lx:0,ly:0};function uc(){cam.position.set(O.tx+O.r*Math.sin(O.p)*Math.sin(O.t),O.ty+O.r*Math.cos(O.p),O.tz+O.r*Math.sin(O.p)*Math.cos(O.t));cam.lookAt(O.tx,O.ty,O.tz);}document.addEventListener('mousedown',e=>{O.act=true;O.rgt=(e.button===2);O.lx=e.clientX;O.ly=e.clientY;});document.addEventListener('contextmenu',e=>e.preventDefault());document.addEventListener('mouseup',()=>O.act=false);document.addEventListener('mousemove',e=>{if(!O.act)return;const dx=e.clientX-O.lx,dy=e.clientY-O.ly;O.lx=e.clientX;O.ly=e.clientY;if(O.rgt){const s=O.r*.001,rv=new THREE.Vector3();rv.crossVectors(cam.getWorldDirection(new THREE.Vector3()),cam.up).normalize();O.tx-=rv.x*dx*s;O.ty-=rv.y*dx*s;O.tz-=rv.z*dx*s;}else{O.t-=dx*.005;O.p=Math.max(.02,Math.min(Math.PI-.02,O.p-dy*.005));}uc();});document.addEventListener('wheel',e=>{O.r=Math.max(.01,Math.min(1e5,O.r*(1+e.deltaY*.001)));uc();},{passive:true});window.addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();r.setSize(innerWidth,innerHeight);});document.getElementById('rg').oninput=e=>{mat.roughness=+e.target.value;mat.needsUpdate=true;};document.getElementById('lt').oninput=e=>dl.intensity=+e.target.value;document.getElementById('am').oninput=e=>al.intensity=+e.target.value;document.getElementById('md').onchange=e=>{mesh.visible=e.target.value!=='w';wm.visible=e.target.value!=='s';};uc();(function loop(){requestAnimationFrame(loop);r.render(sc,cam);})();<\/script></body></html>`;}
+
+// ══════════════════════════════════════════════
+// UI HELPERS
+// ══════════════════════════════════════════════
+function prog(pct,msg){document.getElementById('prog-bar').style.width=pct+'%';if(msg)document.getElementById('prog-msg').textContent=msg;}
+function tick(ms=0){return new Promise(r=>setTimeout(r,ms));}
+let toastT;
+function toast(msg,dur=3500){const el=document.getElementById('toast');el.textContent=msg;el.style.display='block';clearTimeout(toastT);toastT=setTimeout(()=>el.style.display='none',dur);}
+
+function showUI(name,stat1,stat2,type){
+  document.getElementById('tb-file').textContent=name;
+  document.getElementById('s1v').textContent=stat1;
+  document.getElementById('s2v').textContent=stat2||'';
+  document.getElementById('tb-s1').style.display='';
+  document.getElementById('tb-s2').style.display=stat2?'':'none';
+  ['btn-measure','btn-reset','btn-share','btn-export','btn-new'].forEach(id=>document.getElementById(id).style.display='');
+  document.getElementById('side').style.display='flex';
+  document.getElementById('hint').style.display='';
+  document.getElementById('drop-screen').style.display='none';
+}
+
+function populateStats(data,type){
+  const b=data.rawBounds||data.bounds;
+  const rows=type==='cloud'?[
+    ['Total pts',(data.totalPoints/1e6).toFixed(1)+'M'],
+    ['Loaded',(data.loadedPoints/1e6).toFixed(1)+'M'],
+    ['File',data.sizeMB+'MB'],
+    ['RGB',data.hasRGB?'Yes':'No'],
+    ['X span',((b.xMax-b.xMin)||0).toFixed(1)+'m'],
+    ['Y span',((b.yMax-b.yMin)||0).toFixed(1)+'m'],
+    ['Z span',((b.zMax-b.zMin)||0).toFixed(1)+'m'],
+    ['Step','1/'+data.step],
+  ]:[
+    ['Vertices',data.vertCount.toLocaleString()],
+    ['Faces',data.faceCount.toLocaleString()],
+    ['File',data.sizeMB+'MB'],
+    ['Colours',data.hasColors?'Yes':'No'],
+    ['X span',((b.xMax-b.xMin)||0).toFixed(2)+'m'],
+    ['Y span',((b.yMax-b.yMin)||0).toFixed(2)+'m'],
+    ['Z span',((b.zMax-b.zMin)||0).toFixed(2)+'m'],
+    ['Format',data.fmt||'PLY'],
+  ];
+  document.getElementById('statgrid').innerHTML=rows.map(([l,v])=>`<div class="sbox"><div class="slbl">${l}</div><div class="snum">${v}</div></div>`).join('');
+  document.getElementById('finfo').innerHTML=rows.map(([l,v])=>`${l}: ${v}`).join('<br>');
+}
+
+function loadNew(){
+  cloudData=null;meshBuilt=false;
+  [cloudMesh,solidMesh,wireMesh].forEach(m=>{if(m){scene.remove(m);}});
+  cloudMesh=solidMesh=wireMesh=null;
+  document.getElementById('drop-screen').style.display='flex';
+  document.getElementById('side').style.display='none';
+  ['btn-measure','btn-reset','btn-share','btn-export','btn-new','tb-s1','tb-s2'].forEach(id=>document.getElementById(id).style.display='none');
+  document.getElementById('mode-btns').style.display='none';
+  document.getElementById('tb-file').textContent='No file loaded';
+}
+
+// ══════════════════════════════════════════════
+// FILE HANDLING
+// ══════════════════════════════════════════════
+async function handleFile(file){
+  if(!file)return;
+  const ext=file.name.split('.').pop().toLowerCase();
+  const sizeMB=(file.size/1048576).toFixed(1);
+
+  // Show progress screen
+  document.getElementById('drop-screen').style.display='none';
+  document.getElementById('prog-screen').style.display='flex';
+
+  try{
+    if(ext==='las'){
+      document.getElementById('prog-title').textContent='LOADING POINT CLOUD';
+      prog(5,'Reading LAS file…');await tick(30);
+      const buf=await file.arrayBuffer();
+      prog(12,'Parsing header…');await tick(20);
+      const data=await parseLAS(buf,file.name);
+      prog(92,'Building point cloud…');await tick(20);
+      buildCloud(data);
+      cloudData=data;
+      prog(97,'Setting camera…');await tick(20);
+      resetCam();
+      showUI(file.name,data.loadedPoints.toLocaleString()+' pts','',  'cloud');
+      populateStats(data,'cloud');
+      if(!data.hasRGB){document.getElementById('cm-rgb').disabled=true;document.getElementById('cm-rgb').style.opacity='.4';setColour('intensity');}
+      
+      document.getElementById('cloud-sec').style.display='block';
+      document.getElementById('mesh-sec').style.display='none';
+      document.getElementById('mode-btns').style.display='none';
+      viewMode='cloud';
+      prog(100,'Done!');await tick(300);
+      document.getElementById('prog-screen').style.display='none';
+      toast(`✓ ${data.loadedPoints.toLocaleString()} pts loaded · click "Build Mesh" to reconstruct`);
+
+    }else if(ext==='ply'||ext==='obj'){
+      document.getElementById('prog-title').textContent='LOADING MESH';
+      prog(5,'Reading file…');await tick(30);
+      let parsed;
+      if(ext==='ply'){
+        prog(20,'Parsing PLY…');await tick(10);
+        const buf=await file.arrayBuffer();
+        parsed=parsePLY(buf);
+      }else{
+        prog(20,'Parsing OBJ…');await tick(10);
+        const txt=await file.text();
+        parsed=parseOBJ(txt);
+      }
+      prog(75,'Building scene…');await tick(10);
+
+      // Centre
+      parsed.geo.computeBoundingBox();
+      const c=new THREE.Vector3();parsed.geo.boundingBox.getCenter(c);
+      const pa=parsed.geo.attributes.position.array;
+      for(let i=0;i<pa.length;i+=3){pa[i]-=c.x;pa[i+1]-=c.y;pa[i+2]-=c.z;}
+      parsed.geo.attributes.position.needsUpdate=true;
+      parsed.geo.computeBoundingBox();
+
+      buildMeshObj(parsed.geo,parsed.hasColors);
+      const bb=parsed.geo.boundingBox;
+      const sv=new THREE.Vector3();bb.getSize(sv);
+
+      // Fake cloudData for camera
+      cloudData={
+        bounds:{xMin:bb.min.x,xMax:bb.max.x,yMin:bb.min.y,yMax:bb.max.y,zMin:bb.min.z,zMax:bb.max.z},
+        rawBounds:{xMin:bb.min.x,xMax:bb.max.x,yMin:bb.min.y,yMax:bb.max.y,zMin:bb.min.z,zMax:bb.max.z},
+        hasRGB:parsed.hasColors,name:file.name,sizeMB
+      };
+
+      prog(92,'Calibrating camera…');await tick(10);
+      resetCam();
+
+      showUI(file.name,parsed.faceCount.toLocaleString()+' faces','','mesh');
+      populateStats({...parsed,sizeMB,fmt:ext.toUpperCase(),bounds:cloudData.bounds,rawBounds:cloudData.rawBounds},'mesh');
+      
+      document.getElementById('cloud-sec').style.display='none';
+      document.getElementById('mesh-sec').style.display='block';
+      document.getElementById('mode-btns').style.display='none';
+      viewMode='mesh';
+      ground.visible=useSH;
+      if(cloudMesh)cloudMesh.visible=false;
+      prog(100,'Done!');await tick(300);
+      document.getElementById('prog-screen').style.display='none';
+      toast(`✓ ${parsed.faceCount.toLocaleString()} faces · ${parsed.vertCount.toLocaleString()} vertices`);
+
+    }else{
+      throw new Error(`Unsupported format: .${ext}\n\nSupported: .las .ply .obj`);
+    }
+  }catch(e){
+    document.getElementById('prog-screen').style.display='none';
+    document.getElementById('drop-screen').style.display='flex';
+    alert('Error loading file:\n\n'+e.message);
+    console.error(e);
+  }
+}
+
+// ══════════════════════════════════════════════
+// EVENT LISTENERS
+// ══════════════════════════════════════════════
+document.getElementById('browse-btn').addEventListener('click',()=>{
+  document.getElementById('file-input').click();
+});
+document.getElementById('file-input').addEventListener('change',e=>{
+  if(e.target.files[0]){ currentFileBlob=e.target.files[0]; currentFileExt=e.target.files[0].name.split('.').pop().toLowerCase(); handleFile(e.target.files[0]); }
+});
+const db=document.getElementById('drop-box');
+document.addEventListener('dragover',e=>{e.preventDefault();db.classList.add('drag');});
+document.addEventListener('dragleave',e=>{if(!e.relatedTarget||!document.contains(e.relatedTarget))db.classList.remove('drag');});
+document.addEventListener('drop',e=>{
+  e.preventDefault();db.classList.remove('drag');
+  if(e.dataTransfer.files[0]){ currentFileBlob=e.dataTransfer.files[0]; currentFileExt=e.dataTransfer.files[0].name.split('.').pop().toLowerCase(); handleFile(e.dataTransfer.files[0]); }
+});
+
+
+// ══════════════════════════════════════════════
+// SHARE — upload to file.io, get shareable link
+// ══════════════════════════════════════════════
+
+function openShareModal() {
+  const modal = document.getElementById('share-modal');
+  modal.style.display = 'flex';
+  const btn = document.getElementById('share-upload-btn');
+
+  // If we already have a share link, show it immediately
+  if (lastShareUrl) {
+    btn.style.display = 'none';
+    document.getElementById('share-status').innerHTML = `
+      <span style="color:var(--ac2)">✓ Already uploaded!</span><br>
+      <span style="color:var(--mu);font-size:11px;">Link is ready — copy and share</span>
+    `;
+    document.getElementById('share-progress').style.display = 'none';
+    document.getElementById('share-url-row').style.display = 'flex';
+    document.getElementById('share-url-box').value = lastShareUrl;
+    document.getElementById('share-note').style.display = 'block';
+    setTimeout(() => {
+      const box = document.getElementById('share-url-box');
+      box.focus(); box.select();
+    }, 100);
+    return;
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Upload & Generate Link';
+  btn.style.opacity = '1';
+  btn.style.display = '';
+
+  if (currentFileBlob) {
+    const sizeMB = (currentFileBlob.size / 1048576).toFixed(1);
+    const sizeGB = (currentFileBlob.size / 1073741824).toFixed(2);
+    const displaySize = currentFileBlob.size > 1073741824 ? sizeGB + ' GB' : sizeMB + ' MB';
+    document.getElementById('share-status').innerHTML = `
+      <span style="color:var(--tx)">📁 ${currentFileBlob.name}</span><br>
+      <span style="color:var(--mu);font-size:11px;">Size: ${displaySize} · No expiry on GoFile free tier</span>
+    `;
+  } else {
+    document.getElementById('share-status').innerHTML = '<span style="color:var(--warn)">⚠ No file loaded — load a file first.</span>';
+  }
+  document.getElementById('share-progress').style.display = 'none';
+  document.getElementById('share-url-row').style.display = 'none';
+  document.getElementById('share-note').style.display = 'none';
+  document.getElementById('share-prog-bar').style.width = '0%';
+  document.getElementById('share-prog-msg').textContent = '';
+}
+
+function closeShareModal() {
+  document.getElementById('share-modal').style.display = 'none';
+}
+
+// Close if clicking outside modal box — but NOT during upload
+document.addEventListener('click', e => {
+  const modal = document.getElementById('share-modal');
+  if (e.target === modal) {
+    const btn = document.getElementById('share-upload-btn');
+    const isUploading = btn && btn.disabled && btn.textContent === 'Uploading…';
+    if (!isUploading) closeShareModal();
+  }
+});
+
+let activeXHR = null; // track current upload for cancellation
+let gofileToken = 'QDTV3CsCc8b5pfubabXM4GJp8YmtFvhQ'; // hardcoded GoFile account token
+
+
+// ── Browser-side gzip compression using CompressionStream ──
+async function compressFile(file) {
+  try {
+    const stream = file.stream().pipeThrough(new CompressionStream('gzip'));
+    const chunks = [];
+    const reader = stream.getReader();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+    }
+    return new Blob(chunks, { type: 'application/gzip' });
+  } catch(e) {
+    // CompressionStream not supported — return original
+    console.warn('Compression not supported, uploading uncompressed:', e);
+    return file;
+  }
+}
+
+async function startUpload() {
+  if (!currentFileBlob) { alert('No file loaded to share.'); return; }
+
+  const btn = document.getElementById('share-upload-btn');
+  const sizeMB = (currentFileBlob.size / 1048576).toFixed(1);
+
+  btn.disabled = true;
+  btn.textContent = 'Uploading…';
+  btn.style.opacity = '0.7';
+  document.getElementById('share-progress').style.display = 'block';
+  document.getElementById('share-url-row').style.display = 'none';
+  document.getElementById('share-note').style.display = 'none';
+  document.getElementById('share-status').innerHTML = `
+    <span style="color:var(--ac2)">⬆ Uploading ${currentFileBlob.name}</span><br>
+    <span style="color:var(--mu);font-size:11px;">Size: ${sizeMB} MB · Do not close this window</span>
+  `;
+  setShareProg(2, 'Getting upload server…');
+
+  try {
+    // Step 1: Get best GoFile server
+    const serverHeaders = { 'Accept': 'application/json' };
+    if (gofileToken) serverHeaders['Authorization'] = 'Bearer ' + gofileToken;
+    const serverResp = await fetch('https://api.gofile.io/servers', {
+      method: 'GET',
+      headers: serverHeaders
+    });
+    const serverData = await serverResp.json();
+    if (serverData.status !== 'ok') throw new Error('Could not get upload server');
+    const serverName = serverData.data.servers[0].name;
+    const server = serverName;
+    setShareProg(5, `Got server: ${server} — starting upload…`);
+
+    // Step 2: Compress file before upload
+    setShareProg(4, 'Compressing file…', 'This reduces upload size by 50-70%');
+    const compressedBlob = await compressFile(currentFileBlob);
+    const savedPct = Math.round((1 - compressedBlob.size / currentFileBlob.size) * 100);
+    const compMB = (compressedBlob.size / 1048576).toFixed(1);
+    setShareProg(5, `Compressed: ${compMB} MB (saved ${savedPct}%) — uploading…`, '');
+
+    // Step 3: Upload compressed file to GoFile server
+    const uploadName = currentFileBlob.name + '.gz';
+    const formData = new FormData();
+    formData.append('file', compressedBlob, uploadName);
+
+    await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `https://${server}.gofile.io/contents/uploadfile`, true);
+
+      let uploadStart = Date.now();
+      xhr.upload.onprogress = e => {
+        if (e.lengthComputable) {
+          const pct = Math.round((e.loaded / e.total) * 85) + 5;
+          const uploadedMB = (e.loaded / 1048576).toFixed(1);
+          const totalMB = (e.total / 1048576).toFixed(1);
+          const elapsed = (Date.now() - uploadStart) / 1000;
+          const speedMBs = elapsed > 0 ? (e.loaded / 1048576 / elapsed).toFixed(1) : 0;
+          const remaining = speedMBs > 0 ? ((e.total - e.loaded) / 1048576 / speedMBs).toFixed(0) : '?';
+          setShareProg(
+            pct,
+            `Uploading ${uploadedMB} MB of ${totalMB} MB`,
+            `Speed: ${speedMBs} MB/s · ~${remaining}s remaining`
+          );
+        }
+      };
+
+      // Add GoFile token header if available
+      if (gofileToken) {
+        xhr.setRequestHeader('Authorization', 'Bearer ' + gofileToken);
+      }
+
+      xhr.upload.onloadstart = () => {
+        activeXHR = xhr;
+        setShareProg(5, 'Upload started…');
+        document.getElementById('share-cancel-btn').style.display = '';
+        document.getElementById('share-upload-btn').style.display = 'none';
+      };
+      xhr.upload.onloadend = () => {
+        document.getElementById('share-cancel-btn').style.display = 'none';
+        setShareProg(92, 'Upload complete — processing…');
+      };
+
+      xhr.onload = () => {
+        setShareProg(96, 'Generating share link…');
+        try {
+          const resp = JSON.parse(xhr.responseText);
+          if (resp.status === 'ok' && resp.data) {
+            setShareProg(100, '✓ Done!');
+            // GoFile gives us a downloadPage and a fileId
+            // Use downloadPage as the human-readable link
+            // Use direct download URL for the viewer auto-load
+            const pageUrl = resp.data.downloadPage || '';
+            const fileId = resp.data.fileId || resp.data.id || '';
+            const parentId = resp.data.parentFolder || resp.data.folderId || '';
+            const fileName = resp.data.name || currentFileBlob.name;
+            const server = resp.data.servers && resp.data.servers[0] ? resp.data.servers[0] : serverName;
+            // Build direct download URL
+            const directUrl = fileId
+              ? `https://store1.gofile.io/download/direct/${parentId}/${fileName}`
+              : pageUrl;
+            const viewerUrl = buildViewerUrl(directUrl, currentFileBlob.name, true); // true = compressed
+            showShareResult(viewerUrl, pageUrl);
+            resolve();
+          } else {
+            reject(new Error('GoFile error: ' + (resp.status || xhr.responseText)));
+          }
+        } catch(e) {
+          reject(new Error('Could not parse response: ' + e.message));
+        }
+      };
+
+      xhr.onerror  = () => reject(new Error('Network error — check your internet connection and try again.'));
+      xhr.onabort  = () => reject(new Error('CANCELLED'));
+      xhr.ontimeout = () => reject(new Error('Upload timed out — file may be too large or connection too slow.'));
+      xhr.timeout   = 60 * 60 * 1000; // 1 hour timeout
+
+      xhr.send(formData);
+    });
+
+  } catch(e) {
+    if (e.message === 'CANCELLED') return; // user cancelled — cancelUpload() already handled UI
+    showShareError(e.message);
+    btn.disabled = false;
+    btn.textContent = 'Retry Upload';
+    btn.style.opacity = '1';
+  }
+}
+
+function cancelUpload() {
+  if (activeXHR) {
+    activeXHR.abort();
+    activeXHR = null;
+  }
+  document.getElementById('share-cancel-btn').style.display = 'none';
+  document.getElementById('share-upload-btn').style.display = '';
+  document.getElementById('share-upload-btn').disabled = false;
+  document.getElementById('share-upload-btn').textContent = 'Upload & Generate Link';
+  document.getElementById('share-upload-btn').style.opacity = '1';
+  document.getElementById('share-progress').style.display = 'none';
+  document.getElementById('share-status').innerHTML = '<span style="color:var(--warn)">Upload cancelled.</span>';
+  setShareProg(0, '');
+}
+
+function buildViewerUrl(fileUrl, fileName, compressed=false) {
+  const base = window.location.href.split('#')[0];
+  const params = encodeURIComponent(JSON.stringify({ url: fileUrl, name: fileName, compressed }));
+  return base + '#remote=' + params;
+}
+
+function showShareResult(viewerUrl, rawUrl) {
+  lastShareUrl = viewerUrl; // save it so reopening modal shows it again
+  document.getElementById('share-progress').style.display = 'none';
+  document.getElementById('share-status').innerHTML = `
+    <span style="color:var(--ac2)">✓ Upload complete!</span><br>
+    <span style="color:var(--mu);font-size:11px;">Copy the link below and send it to anyone</span>
+  `;
+  document.getElementById('share-url-row').style.display = 'flex';
+  document.getElementById('share-url-box').value = viewerUrl;
+  document.getElementById('share-note').style.display = 'block';
+  document.getElementById('share-upload-btn').style.display = 'none';
+  setTimeout(() => {
+    const box = document.getElementById('share-url-box');
+    box.focus();
+    box.select();
+  }, 100);
+}
+
+function showShareError(msg) {
+  document.getElementById('share-progress').style.display = 'none';
+  document.getElementById('share-status').textContent = '✗ Error: ' + msg;
+  document.getElementById('share-upload-btn').style.display = '';
+  document.getElementById('share-upload-btn').textContent = 'Retry';
+}
+
+function setShareProg(pct, msg, detail) {
+  const p = Math.round(pct);
+  document.getElementById('share-prog-bar').style.width = p + '%';
+  document.getElementById('share-prog-pct').textContent = p + '%';
+  if (msg) document.getElementById('share-prog-msg').textContent = msg;
+  if (detail !== undefined) document.getElementById('share-prog-detail').textContent = detail;
+}
+
+function copyShareUrl() {
+  const url = document.getElementById('share-url-box').value;
+  navigator.clipboard.writeText(url).then(() => {
+    const btn = document.getElementById('copy-btn');
+    btn.textContent = 'Copied!';
+    btn.style.background = 'var(--ac)';
+    setTimeout(() => { btn.textContent = 'Copy'; btn.style.background = 'var(--ac2)'; }, 2000);
+  });
+}
+
+// ── Auto-load from URL hash if shared link opened ──────
+async function checkRemoteLoad() {
+  const hash = window.location.hash;
+  if (!hash || !hash.includes('remote=')) return;
+  const match = hash.match(/remote=([^&]+)/);
+  if (!match) return;
+  try {
+    const params = JSON.parse(decodeURIComponent(match[1]));
+    if (!params.url || !params.name) return;
+
+    document.getElementById('drop-screen').style.display = 'none';
+    document.getElementById('prog-screen').style.display = 'flex';
+    document.getElementById('prog-title').textContent = 'LOADING SHARED FILE';
+    prog(5, `Fetching ${params.name} from share link…`);
+
+    const resp = await fetch(params.url);
+    if (!resp.ok) throw new Error(`Could not fetch file (${resp.status}) — link may have expired.`);
+
+    prog(40, 'Downloading…');
+    const rawBlob = await resp.blob();
+    prog(65, 'Download complete — processing…');
+
+    let finalBlob = rawBlob;
+    if (params.compressed) {
+      prog(70, 'Decompressing…');
+      try {
+        const ds = new DecompressionStream('gzip');
+        const writer = ds.writable.getWriter();
+        writer.write(await rawBlob.arrayBuffer());
+        writer.close();
+        const chunks = [];
+        const reader = ds.readable.getReader();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          chunks.push(value);
+        }
+        finalBlob = new Blob(chunks);
+        prog(80, 'Decompressed — loading…');
+      } catch(e) {
+        console.warn('Decompression failed, trying raw:', e);
+        finalBlob = rawBlob;
+      }
+    }
+
+    const fileName = params.name.replace(/\.gz$/, '');
+    const file = new File([finalBlob], fileName, { type: finalBlob.type });
+    currentFileBlob = file;
+    currentFileExt = fileName.split('.').pop().toLowerCase();
+    await handleFile(file);
+  } catch(e) {
+    document.getElementById('prog-screen').style.display = 'none';
+    document.getElementById('drop-screen').style.display = 'flex';
+    alert('Could not load shared file:\n\n' + e.message + '\n\nThe link may have expired (14 day limit) or already been used.');
+  }
+}
+
+
+initThree();
+checkRemoteLoad();
+</script>
+</body>
+</html>
