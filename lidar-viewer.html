@@ -1012,10 +1012,30 @@ function openShareModal() {
   const modal = document.getElementById('share-modal');
   modal.style.display = 'flex';
   const btn = document.getElementById('share-upload-btn');
+
+  // If we already have a share link, show it immediately
+  if (lastShareUrl) {
+    btn.style.display = 'none';
+    document.getElementById('share-status').innerHTML = `
+      <span style="color:var(--ac2)">✓ Already uploaded!</span><br>
+      <span style="color:var(--mu);font-size:11px;">Link is ready — copy and share</span>
+    `;
+    document.getElementById('share-progress').style.display = 'none';
+    document.getElementById('share-url-row').style.display = 'flex';
+    document.getElementById('share-url-box').value = lastShareUrl;
+    document.getElementById('share-note').style.display = 'block';
+    setTimeout(() => {
+      const box = document.getElementById('share-url-box');
+      box.focus(); box.select();
+    }, 100);
+    return;
+  }
+
   btn.disabled = false;
   btn.textContent = 'Upload & Generate Link';
   btn.style.opacity = '1';
-  // Reset state
+  btn.style.display = '';
+
   if (currentFileBlob) {
     const sizeMB = (currentFileBlob.size / 1048576).toFixed(1);
     const sizeGB = (currentFileBlob.size / 1073741824).toFixed(2);
@@ -1038,10 +1058,14 @@ function closeShareModal() {
   document.getElementById('share-modal').style.display = 'none';
 }
 
-// Close if clicking outside modal box
+// Close if clicking outside modal box — but NOT during upload
 document.addEventListener('click', e => {
   const modal = document.getElementById('share-modal');
-  if (e.target === modal) closeShareModal();
+  if (e.target === modal) {
+    const btn = document.getElementById('share-upload-btn');
+    const isUploading = btn && btn.disabled && btn.textContent === 'Uploading…';
+    if (!isUploading) closeShareModal();
+  }
 });
 
 async function startUpload() {
@@ -1139,7 +1163,10 @@ function buildViewerUrl(fileUrl, fileName) {
   return base + '#remote=' + params;
 }
 
+let lastShareUrl = null; // remember last successful share link
+
 function showShareResult(viewerUrl, rawUrl) {
+  lastShareUrl = viewerUrl; // save it so reopening modal shows it again
   document.getElementById('share-progress').style.display = 'none';
   document.getElementById('share-status').innerHTML = `
     <span style="color:var(--ac2)">✓ Upload complete!</span><br>
@@ -1149,7 +1176,6 @@ function showShareResult(viewerUrl, rawUrl) {
   document.getElementById('share-url-box').value = viewerUrl;
   document.getElementById('share-note').style.display = 'block';
   document.getElementById('share-upload-btn').style.display = 'none';
-  // Auto select the URL
   setTimeout(() => {
     const box = document.getElementById('share-url-box');
     box.focus();
