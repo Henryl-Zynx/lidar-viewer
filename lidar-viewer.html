@@ -227,7 +227,7 @@ input[type=range]{width:100%;accent-color:var(--ac2);height:2px;margin:3px 0 10p
 </div>
 
 <div id="hint">🖱 Drag:orbit · Scroll:zoom · Right:pan · R:reset</div>
-<div id="share-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100;align-items:center;justify-content:center;"><div style="background:#0c1018;border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:28px;width:min(520px,90vw);position:relative;"><button onclick="closeShareModal()" style="position:absolute;top:14px;right:16px;background:none;border:none;color:#4e5e78;font-size:18px;cursor:pointer;">✕</button><div style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--ac2);margin-bottom:6px;">🔗 Share this scan</div><div style="font-size:12px;color:var(--mu);margin-bottom:18px;line-height:1.7;">Your file will be uploaded to <strong style="color:var(--tx)">litterbox.catbox.moe</strong> — a free anonymous file host. The link expires after <strong style="color:var(--tx)">72 hours</strong>. Anyone with the link can view your scan in full 3D.</div><div id="share-status" style="font-family:var(--mono);font-size:12px;color:var(--mu);margin-bottom:12px;min-height:20px;"></div><div id="share-progress" style="display:none;margin-bottom:12px;"><div style="height:2px;background:#1e2a3a;border-radius:99px;overflow:hidden;"><div id="share-prog-bar" style="height:100%;background:var(--ac2);width:0%;transition:width .3s;"></div></div><div id="share-prog-msg" style="font-family:var(--mono);font-size:10px;color:var(--mu);margin-top:6px;"></div></div><div id="share-url-row" style="display:none;display:flex;gap:8px;align-items:center;margin-bottom:10px;"><input id="share-url-box" readonly style="flex:1;background:#111620;border:1px solid rgba(255,255,255,.1);border-radius:6px;padding:8px 12px;font-family:var(--mono);font-size:11px;color:var(--tx);outline:none;" value=""><button onclick="copyShareUrl()" id="copy-btn" style="background:var(--ac2);color:#07090f;font-family:var(--mono);font-size:11px;font-weight:700;border:none;border-radius:6px;padding:8px 14px;cursor:pointer;white-space:nowrap;">Copy</button></div><div id="share-note" style="font-size:11px;color:var(--mu);line-height:1.6;display:none;">✓ Link copied! The recipient opens this URL in their browser — the viewer loads automatically with your scan.<br><br><span style="color:#f0904a;">⚠ Link expires 72 hours after upload.</span></div><button id="share-upload-btn" onclick="startUpload()" style="width:100%;background:var(--ac2);color:#07090f;font-family:var(--mono);font-size:12px;font-weight:700;border:none;border-radius:7px;padding:10px;cursor:pointer;margin-top:4px;">Upload 0026 Generate Link</button></div></div>
+<div id="share-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100;align-items:center;justify-content:center;"><div style="background:#0c1018;border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:28px;width:min(520px,90vw);position:relative;"><button onclick="closeShareModal()" style="position:absolute;top:14px;right:16px;background:none;border:none;color:#4e5e78;font-size:18px;cursor:pointer;">✕</button><div style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--ac2);margin-bottom:6px;">🔗 Share this scan</div><div style="font-size:12px;color:var(--mu);margin-bottom:18px;line-height:1.7;">Your file will be uploaded to <strong style="color:var(--tx)">GoFile.io</strong> — a free anonymous file host with no size limit. No account needed. Anyone with the link can view your scan in full 3D.</div><div id="share-status" style="font-family:var(--mono);font-size:12px;color:var(--mu);margin-bottom:12px;min-height:20px;"></div><div id="share-progress" style="display:none;margin-bottom:12px;"><div style="height:2px;background:#1e2a3a;border-radius:99px;overflow:hidden;"><div id="share-prog-bar" style="height:100%;background:var(--ac2);width:0%;transition:width .3s;"></div></div><div id="share-prog-msg" style="font-family:var(--mono);font-size:10px;color:var(--mu);margin-top:6px;"></div></div><div id="share-url-row" style="display:none;display:flex;gap:8px;align-items:center;margin-bottom:10px;"><input id="share-url-box" readonly style="flex:1;background:#111620;border:1px solid rgba(255,255,255,.1);border-radius:6px;padding:8px 12px;font-family:var(--mono);font-size:11px;color:var(--tx);outline:none;" value=""><button onclick="copyShareUrl()" id="copy-btn" style="background:var(--ac2);color:#07090f;font-family:var(--mono);font-size:11px;font-weight:700;border:none;border-radius:6px;padding:8px 14px;cursor:pointer;white-space:nowrap;">Copy</button></div><div id="share-note" style="font-size:11px;color:var(--mu);line-height:1.6;display:none;">✓ Link copied! The recipient opens this URL in their browser — the viewer loads automatically with your scan.<br><br><span style="color:#f0904a;">⚠ Free GoFile links may expire if not accessed for 10 days.</span></div><button id="share-upload-btn" onclick="startUpload()" style="width:100%;background:var(--ac2);color:#07090f;font-family:var(--mono);font-size:12px;font-weight:700;border:none;border-radius:7px;padding:10px;cursor:pointer;margin-top:4px;">Upload 0026 Generate Link</button></div></div>
 <div id="toast"></div>
 <div id="mcur"></div>
 
@@ -1022,7 +1022,7 @@ function openShareModal() {
     const displaySize = currentFileBlob.size > 1073741824 ? sizeGB + ' GB' : sizeMB + ' MB';
     document.getElementById('share-status').innerHTML = `
       <span style="color:var(--tx)">📁 ${currentFileBlob.name}</span><br>
-      <span style="color:var(--mu);font-size:11px;">Size: ${displaySize} · Expires 72 hours after upload</span>
+      <span style="color:var(--mu);font-size:11px;">Size: ${displaySize} · No expiry on GoFile free tier</span>
     `;
   } else {
     document.getElementById('share-status').innerHTML = '<span style="color:var(--warn)">⚠ No file loaded — load a file first.</span>';
@@ -1049,7 +1049,7 @@ async function startUpload() {
 
   const btn = document.getElementById('share-upload-btn');
   const sizeMB = (currentFileBlob.size / 1048576).toFixed(1);
-  
+
   btn.disabled = true;
   btn.textContent = 'Uploading…';
   btn.style.opacity = '0.7';
@@ -1060,48 +1060,65 @@ async function startUpload() {
     <span style="color:var(--ac2)">⬆ Uploading ${currentFileBlob.name}</span><br>
     <span style="color:var(--mu);font-size:11px;">Size: ${sizeMB} MB · Do not close this window</span>
   `;
-  setShareProg(2, 'Connecting to file.io…');
+  setShareProg(2, 'Getting upload server…');
 
   try {
+    // Step 1: Get best GoFile server
+    const serverResp = await fetch('https://api.gofile.io/servers', {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' }
+    });
+    const serverData = await serverResp.json();
+    if (serverData.status !== 'ok') throw new Error('Could not get upload server');
+    const server = serverData.data.servers[0].name;
+    setShareProg(5, `Got server: ${server} — starting upload…`);
+
+    // Step 2: Upload to GoFile server
     const formData = new FormData();
-    formData.append('reqtype', 'fileupload');
-    formData.append('time', '72h'); // 72 hour expiry
-    formData.append('fileToUpload', currentFileBlob, currentFileBlob.name);
+    formData.append('file', currentFileBlob, currentFileBlob.name);
 
     await new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
-      xhr.open('POST', 'https://litterbox.catbox.moe/resources/internals/api.php', true);
+      xhr.open('POST', `https://${server}.gofile.io/contents/uploadfile`, true);
 
       xhr.upload.onprogress = e => {
         if (e.lengthComputable) {
-          const pct = Math.round((e.loaded / e.total) * 88) + 2;
+          const pct = Math.round((e.loaded / e.total) * 85) + 5;
           const uploadedMB = (e.loaded / 1048576).toFixed(1);
           const totalMB = (e.total / 1048576).toFixed(1);
-          const speed = '';
-          setShareProg(pct, `Uploading: ${uploadedMB} MB / ${totalMB} MB (${pct}%)`);
+          setShareProg(pct, `Uploading: ${uploadedMB} MB / ${totalMB} MB (${pct-5}%)`);
         }
       };
 
-      xhr.upload.onloadstart = () => setShareProg(2, 'Upload started…');
-      xhr.upload.onloadend = () => setShareProg(91, 'Upload complete — waiting for server…');
+      xhr.upload.onloadstart = () => setShareProg(5, 'Upload started…');
+      xhr.upload.onloadend  = () => setShareProg(92, 'Upload complete — processing…');
 
       xhr.onload = () => {
-        setShareProg(96, 'Processing on server…');
-        const raw = xhr.responseText.trim();
-        // litterbox returns a plain URL on success, or an error string
-        if (raw.startsWith('https://')) {
-          setShareProg(100, '✓ Done!');
-          const viewerUrl = buildViewerUrl(raw, currentFileBlob.name);
-          showShareResult(viewerUrl, raw);
-          resolve();
-        } else {
-          reject(new Error('Upload failed: ' + raw));
+        setShareProg(96, 'Generating share link…');
+        try {
+          const resp = JSON.parse(xhr.responseText);
+          if (resp.status === 'ok' && resp.data && resp.data.downloadPage) {
+            const fileUrl = resp.data.downloadPage;
+            setShareProg(100, '✓ Done!');
+            // For GoFile we share the download page URL directly
+            // The viewer URL encodes the direct file download link
+            const directUrl = resp.data.servers
+              ? `https://${resp.data.servers}.gofile.io/download/direct/${resp.data.parentFolder}/${resp.data.name}`
+              : fileUrl;
+            const viewerUrl = buildViewerUrl(directUrl, currentFileBlob.name);
+            showShareResult(viewerUrl, fileUrl);
+            resolve();
+          } else {
+            reject(new Error('GoFile error: ' + (resp.status || xhr.responseText)));
+          }
+        } catch(e) {
+          reject(new Error('Could not parse response: ' + e.message));
         }
       };
 
-      xhr.onerror = () => reject(new Error('Network error — check your internet connection.'));
-      xhr.ontimeout = () => reject(new Error('Upload timed out — try again.'));
-      xhr.timeout = 30 * 60 * 1000; // 30 min timeout for large files
+      xhr.onerror   = () => reject(new Error('Network error — check your internet connection and try again.'));
+      xhr.ontimeout = () => reject(new Error('Upload timed out — file may be too large or connection too slow.'));
+      xhr.timeout   = 60 * 60 * 1000; // 1 hour timeout
 
       xhr.send(formData);
     });
